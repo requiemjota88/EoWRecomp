@@ -60,8 +60,9 @@ jobs:
           clang --version | head -1; ld.lld --version; make --version | head -1; python --version
           pkg-config --modversion sdl3 shaderc 2>/dev/null || true
 
-      - name: Cache the FFmpeg build and the zig download
-        uses: actions/cache@v4
+      - name: Restore the FFmpeg build and the zig download
+        id: depcache
+        uses: actions/cache/restore@v4
         with:
           path: |
             build/deps-win
@@ -70,6 +71,15 @@ jobs:
 
       - name: Dependencies (FFmpeg, LGPL only, from pinned source)
         run: make deps-windows
+
+      - name: Save the dependency cache (also when a later step fails)
+        if: always() && steps.depcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/deps-win
+            build/zig
+          key: deps-${{ runner.os }}-${{ hashFiles('tools/build_deps_windows.sh', 'tools/fetch_zig.sh') }}
 
       - name: Unit tests that need no GPU and no game files
         run: |

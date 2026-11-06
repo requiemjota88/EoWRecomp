@@ -2,7 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/mman.h>
+#endif
 
 #include "cpu.h"
 
@@ -13,6 +17,8 @@ extern int ntests;
 #define BUF_SIZE 0x40000
 
 void rt_dispatch(Cpu *c) { (void)c; }
+void fnprof_hit(uint64_t addr, uint64_t lr, uint64_t x0) { (void)addr; (void)lr; (void)x0; }
+volatile int g_fnprof;
 void rt_svc(Cpu *c, uint32_t imm, uint64_t pc) { (void)c; (void)imm; (void)pc; }
 void rt_brk(Cpu *c, uint32_t imm, uint64_t pc) { (void)c; (void)imm; (void)pc; abort(); }
 void rt_udf(Cpu *c, uint64_t pc) { (void)c; (void)pc; abort(); }
@@ -38,8 +44,13 @@ static void *map_file(const char *path, uint64_t addr, size_t *size) {
     *size = ftell(f);
     fseek(f, 0, SEEK_SET);
     size_t len = (*size + 0x3fff) & ~0x3fffull;
+#ifdef _WIN32
+    void *p = VirtualAlloc((void *)addr, len, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    if (p != (void *)addr) { fprintf(stderr, "VirtualAlloc %llx failed: %lu\n", (unsigned long long)addr, GetLastError()); exit(1); }
+#else
     void *p = mmap((void *)addr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
     if (p != (void *)addr) { perror("mmap"); exit(1); }
+#endif
     fread(p, 1, *size, f);
     fclose(f);
     return p;
