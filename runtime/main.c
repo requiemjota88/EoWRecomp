@@ -9,6 +9,7 @@
 
 #include "gamelib.h"
 #include "paths.h"
+#include "selftest.h"
 #include "settings.h"
 #include "hle.h"
 #include "kernel.h"
@@ -204,6 +205,8 @@ int main(int argc, char **argv) {
         else if (argv[i][0] != '-') root = arg_root;
     }
     rt_paths_init();  // the data root becomes the working directory (runtime/paths.h)
+    for (int i = 1; i < argc; i++)
+        if (!strcmp(argv[i], "--selftest")) return rt_selftest(argc, argv);  // package check, no game files (selftest.c)
 #ifdef __ANDROID__
     android_env_file();
     if (!g_guest_reserved && !plat_reserve_guest(GUEST_LO, GUEST_HI)) {

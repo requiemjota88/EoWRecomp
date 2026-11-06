@@ -13,8 +13,28 @@ MODE=${3:-both}
 REF=${REF:-652e234}
 OUT=build/test_translate
 mkdir -p "$OUT/old" "$OUT/dump"
-git show "$REF:runtime/nvn/maxwell/translate.c" > "$OUT/old/translate.c"
-git show "$REF:runtime/nvn/maxwell/shader.h" > "$OUT/old/shader.h"
+# The reference translator comes from git history. A fork or shallow checkout may not have that commit: then there is no
+# MSL reference to compare with, and only the GLSL checks run (shaderc compiles + SPIRV-Tools validates every output)
+# with a stub standing in for the reference - said out loud, never silently.
+if git cat-file -e "$REF^{commit}" 2>/dev/null; then
+  git show "$REF:runtime/nvn/maxwell/translate.c" > "$OUT/old/translate.c"
+  git show "$REF:runtime/nvn/maxwell/shader.h" > "$OUT/old/shader.h"
+else
+  echo "test_translate: reference commit $REF not in this repository: MSL comparison SKIPPED, GLSL checks only"
+  MODE=glsl
+  [ "${GLSL:-1}" = 1 ] || { echo "test_translate: nothing to test (GLSL=0 and no reference)"; exit 1; }
+  cat > "$OUT/old/translate.c" <<'STUB'
+#include <stddef.h>
+#include <stdint.h>
+typedef struct ShaderInfo ShaderInfo;
+typedef struct ShaderKey ShaderKey;
+uint64_t maxwell_gmem_base, maxwell_gmem_size, maxwell_dbg_code, maxwell_dbg_pc, maxwell_dbg_reg, maxwell_dbg_vs;
+ShaderInfo *maxwell_translate(const uint8_t *c, size_t n, int s, const ShaderKey *k) { (void)c, (void)n, (void)s, (void)k; return NULL; }
+void maxwell_free(ShaderInfo *i) { (void)i; }
+void maxwell_disassemble(void) {}
+STUB
+  : > "$OUT/old/shader.h"
+fi
 CC=${CC:-clang}
 RENAME="-Dmaxwell_translate=old_maxwell_translate -Dmaxwell_free=old_maxwell_free
  -Dmaxwell_disassemble=old_maxwell_disassemble -Dmaxwell_gmem_base=old_maxwell_gmem_base

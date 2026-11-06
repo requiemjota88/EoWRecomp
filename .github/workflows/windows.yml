@@ -1,0 +1,122 @@
+# Windows x64: builds EoWRecomp natively (MSYS2 UCRT64, clang), tests it, assembles the ZIP the player downloads and
+# publishes it. No game files are used or needed anywhere: the game code is generated on the player's PC from their own
+# copy (eowgen + zig are in the ZIP). tools/windows/verify_package.sh refuses a ZIP with anything of the game's in it.
+#   push / pull request : build + tests + verified ZIP as a workflow artifact
+#   tag v*              : the same, then a GitHub Release with the ZIP and its sha256
+#   manual run          : "release" input publishes a pre-release named after the run
+name: windows
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish the ZIP as a GitHub pre-release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # releases (tags / manual run); everything else is read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      MSYSTEM: UCRT64
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit   # (the setup-python python: eowgen's venv + PyInstaller are Windows programs)
+          install: >-
+            make zip unzip curl git diffutils
+            mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-lld mingw-w64-ucrt-x86_64-llvm
+            mingw-w64-ucrt-x86_64-binutils mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-ntldd mingw-w64-ucrt-x86_64-sdl3
+            mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-vulkan-memory-allocator mingw-w64-ucrt-x86_64-shaderc
+            mingw-w64-ucrt-x86_64-glslang mingw-w64-ucrt-x86_64-spirv-tools
+
+      - name: Toolchain versions
+        run: |
+          clang --version | head -1; ld.lld --version; make --version | head -1; python --version
+          pkg-config --modversion sdl3 shaderc 2>/dev/null || true
+
+      - name: Cache the FFmpeg build and the zig download
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/deps-win
+            build/zig
+          key: deps-${{ runner.os }}-${{ hashFiles('tools/build_deps_windows.sh', 'tools/fetch_zig.sh') }}
+
+      - name: Dependencies (FFmpeg, LGPL only, from pinned source)
+        run: make deps-windows
+
+      - name: Unit tests that need no GPU and no game files
+        run: |
+          set -e
+          python -m pip install -q capstone==5.0.9 unicorn==2.1.4 lz4==4.4.5
+          tools/test_spvcache.sh
+          python tools/test_simd.py --encodings 3000 --cases 4 --jobs 4 | tail -8
+          python tools/test_lift.py --synth | tail -5
+          GLSL=1 tools/test_translate.sh 3000 4 glsl | tail -15
+
+      - name: Build the release (runtime, import library, generator, compiler, ZIP)
+        run: make -j"$(nproc)" dist DIST_PY=python
+
+      - name: Verify the ZIP the way a player's PC would use it
+        run: tools/windows/verify_package.sh
+
+      - name: Upload the ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: EoWRecomp-windows-x64
+          path: |
+            build/dist/EoWRecomp-*-windows-x64.zip
+            build/dist/EoWRecomp-*-windows-x64.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload the verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs
+          path: |
+            build/verify/*.out
+            build/verify/EoWRecomp/selftest.log
+            build/verify/probe/*
+            build/test_translate/log_*.txt
+          if-no-files-found: ignore
+
+      - name: Publish a release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          zip=$(ls build/dist/EoWRecomp-*-windows-x64.zip)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag=${GITHUB_REF#refs/tags/}; pre=""; else tag="build-${GITHUB_RUN_NUMBER}"; pre="--prerelease"; fi
+          notes="Windows 10/11 x64. Extract the ZIP and run eowrecomp.exe (see LEIA-ME.txt). Contains no game files: the game code is generated on your PC from your own copy. SHA-256: $(cut -d' ' -f1 "$zip.sha256")"
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" "$zip" "$zip.sha256" $pre --target "$GITHUB_SHA" --title "EoWRecomp $tag (Windows x64)" --notes "$notes"
