@@ -73,18 +73,20 @@ jobs:
 
       - name: Unit tests that need no GPU and no game files
         run: |
-          set -e
           python -m pip install -q capstone==5.0.9 unicorn==2.1.4 lz4==4.4.5
-          tools/test_spvcache.sh
-          python tools/test_simd.py --encodings 3000 --cases 4 --jobs 4 | tail -8
-          python tools/test_lift.py --synth | tail -5
-          GLSL=1 tools/test_translate.sh 3000 4 glsl | tail -15
+          fail=0
+          R=tools/windows/ci_run.sh
+          $R test_spvcache tools/test_spvcache.sh || fail=1
+          $R test_simd python tools/test_simd.py --encodings 3000 --cases 4 --jobs 4 || fail=1
+          $R test_lift python tools/test_lift.py --synth || fail=1
+          $R test_translate tools/test_translate.sh 3000 4 glsl || fail=1
+          exit $fail
 
       - name: Build the release (runtime, import library, generator, compiler, ZIP)
-        run: make -j"$(nproc)" dist DIST_PY=python
+        run: tools/windows/ci_run.sh make_dist make -j"$(nproc)" dist DIST_PY=python
 
       - name: Verify the ZIP the way a player's PC would use it
-        run: tools/windows/verify_package.sh
+        run: tools/windows/ci_run.sh verify_package tools/windows/verify_package.sh
 
       - name: Upload the ZIP
         uses: actions/upload-artifact@v4
@@ -106,6 +108,7 @@ jobs:
             build/verify/EoWRecomp/selftest.log
             build/verify/probe/*
             build/test_translate/log_*.txt
+            build/ci-logs/*.log
           if-no-files-found: ignore
 
       - name: Publish a release
