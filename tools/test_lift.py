@@ -208,7 +208,7 @@ def main():
     exe = os.path.join(work, 'harness')
     cc = os.environ.get('CC', 'clang').split()
     extra = ['-march=' + ('x86_64_v3' if 'zig' in cc[0] else 'x86-64-v3')] if platform.machine().lower() in ('x86_64', 'amd64') else []  # (zig cc spells the CPU its own way)
-    subprocess.check_call(cc + extra + ['-O1', '-Wno-deprecated-declarations', '-fno-strict-aliasing', '-I', os.path.join(ROOT, 'runtime'),
+    subprocess.check_call(cc + extra + ['-O1', '-DEOW_RUNTIME', '-Wno-deprecated-declarations', '-fno-strict-aliasing', '-I', os.path.join(ROOT, 'runtime'),
                            '-o', exe, harness, os.path.join(work, 'tests.c')])
 
     mu = uc.Uc(uc.UC_ARCH_ARM64, uc.UC_MODE_ARM)

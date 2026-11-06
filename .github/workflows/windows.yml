@@ -78,7 +78,7 @@ jobs:
           R=tools/windows/ci_run.sh
           $R test_spvcache tools/test_spvcache.sh || fail=1
           $R test_simd python tools/test_simd.py --encodings 3000 --cases 4 --jobs 4 || fail=1
-          $R test_lift python tools/test_lift.py --synth || fail=1
+          $R test_lift python tools/test_lift.py --synth 0x400000 3000 || fail=1
           $R test_translate tools/test_translate.sh 3000 4 glsl || fail=1
           exit $fail
 
