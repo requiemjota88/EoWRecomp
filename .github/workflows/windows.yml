@@ -93,7 +93,7 @@ jobs:
           exit $fail
 
       - name: Build the release (runtime, import library, generator, compiler, ZIP)
-        run: tools/windows/ci_run.sh make_dist make -j"$(nproc)" dist DIST_PY=python
+        run: tools/windows/ci_run.sh make_dist make -k -j"$(nproc)" dist DIST_PY=python
 
       - name: Verify the ZIP the way a player's PC would use it
         run: tools/windows/ci_run.sh verify_package tools/windows/verify_package.sh
