@@ -39,13 +39,22 @@ cp -R "$ZIG" "$OUT/zig"
 # ---- DLLs: the exe's imports, recursively, minus what Windows itself provides
 export PATH="$PWD/$DEPS/bin:$PATH"
 ntldd -R "$EXE" | tr -d '\r' > "$D/ntldd.txt"
-missing=$(grep -c 'not found' "$D/ntldd.txt" || true)
-if [ "$missing" != 0 ]; then
-    echo "package.sh: the exe has imports ntldd can't resolve:"; grep 'not found' "$D/ntldd.txt"; exit 1
-fi
+# ntldd reports Windows' own virtual / private DLLs (api-ms-*, ext-ms-*, Pdm*...) as "not found": only a missing DLL that is
+# not in System32 either is a package problem
+SYS=$(cygpath -u "${SYSTEMROOT:-C:\\Windows}")/System32
+missing=0
+while IFS= read -r line; do
+    case "$line" in *"not found"*) ;; *) continue ;; esac
+    name=$(echo "$line" | sed 's/=>.*//' | tr -d '[:space:]')
+    lname=$(echo "$name" | tr 'A-Z' 'a-z')
+    case "$lname" in api-ms-win-*|ext-ms-win-*|ext-ms-onecore-*) continue ;; esac
+    [ -f "$SYS/$name" ] && continue
+    echo "package.sh: import not found anywhere: $name"; missing=$((missing + 1))
+done < "$D/ntldd.txt"
+[ "$missing" = 0 ] || { echo "package.sh: the exe has imports ntldd can't resolve"; exit 1; }
 n=0
 while IFS= read -r line; do
-    case "$line" in *"=>"*) ;; *) continue ;; esac
+    case "$line" in *"not found"*) continue ;; *"=>"*) ;; *) continue ;; esac
     name=$(echo "${line%%=>*}" | tr -d '[:space:]')
     path=${line#*=> }; path=${path% (0x*}
     p=$(cygpath -u "$path")
