@@ -1,0 +1,27 @@
+EoWRecomp - third-party components shipped in the Windows package
+================================================================
+EoWRecomp's own code is MIT licensed (EoWRecomp-LICENSE.txt, which keeps LAS Recomp's copyright notice). It grants
+nothing for any game. Components below keep their own licenses; their license files are in this folder where the
+build could collect them.
+
+Runtime (eowrecomp.exe and its DLLs)
+- SDL3 - zlib license. https://libsdl.org
+- FFmpeg (avformat/avcodec/avutil/swscale DLLs) - LGPL-2.1-or-later. Built LGPL-only from the unmodified FFmpeg 9.0.2
+  source (https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz), shared libraries, with: --disable-everything and only the
+  file protocol, the matroska and mov demuxers, and the vp9, vp8, vorbis, opus, h264, aac decoders and parsers (exact
+  configure line: tools/build_deps_windows.sh in the source repository). The DLLs can be replaced by your own build.
+- shaderc, glslang, SPIRV-Tools, SPIRV-Headers - Apache-2.0 (glslang also BSD-3-Clause / MIT parts).
+- Vulkan-Loader (libvulkan-1.dll), Vulkan-Headers - Apache-2.0.
+- Vulkan Memory Allocator (header-only, compiled in) - MIT.
+- Dear ImGui (compiled in) - MIT. stb libraries (compiled in) - public domain / MIT.
+- SMAA reference shader - MIT.
+- MinGW-w64 runtime, libwinpthread - MIT / ZPL / public domain; GCC runtime libraries (libgcc, libstdc++) - GPL-3.0
+  with the GCC Runtime Library Exception.
+- Fonts: Baloo 2 (SIL Open Font License 1.1), DejaVu Sans (Bitstream Vera license).
+
+Game code builder (eowgen/ and zig/ - used on your machine to turn YOUR game files into a program)
+- zig - MIT; its bundled clang/lld/LLVM - Apache-2.0 with LLVM exceptions; its MinGW-w64 C runtime - MIT/ZPL/public domain.
+- eowgen is the project's generator (tools/gen.py, MIT) frozen with PyInstaller (GPL-2.0-or-later with the bootloader
+  exception), Python (PSF), capstone (BSD), unicorn (GPL-2.0), lz4 (BSD-3-Clause).
+
+Source for everything EoWRecomp itself is under the MIT license: the repository this package was built from.

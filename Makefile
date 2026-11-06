@@ -131,8 +131,10 @@ IMGUI_OBJ += $(B)/imgui/imgui_impl_vulkan.o
 UIFLAGS  := -x c++ $(OSFLAGS)  # the .mm UI sources are plain C++ apart from __APPLE__ blocks
 GAMELIB  := $(B)/eowgame.dll
 # the runtime functions it calls (RT_API in runtime/cpu.h): exported by the .exe, imported through an import library
-# made from tools/windows/eowrecomp.def
-IMPLIB   := $(B)/eowrecomp.lib
+# made from tools/windows/eowrecomp.def. Named eowrecomp.dll.a: the file runtime/gamebuild.c looks for next to the exe.
+IMPLIB   := $(B)/eowrecomp.dll.a
+# (zig's dlltool when cross-compiling, else the LLVM one that comes with clang in MSYS2)
+DLLTOOL  ?= $(if $(ZIG),$(ZIG) dlltool,llvm-dlltool)
 GAMELIB_LDFLAGS := -shared -fuse-ld=lld $(IMPLIB)
 GAMELIB_SHARED := -shared  # (+ the import library: runtime/gamebuild.c)
 endif
@@ -196,7 +198,7 @@ $(EXE): $(RT_OBJ) $(BACKEND_OBJ) $(UI_OBJ) $(IMGUI_OBJ)
 ifeq ($(PLATFORM),windows)
 $(IMPLIB): tools/windows/eowrecomp.def
 	@mkdir -p $(dir $@)
-	$(or $(ZIG),zig) dlltool -m i386:x86-64 -D eowrecomp.exe -d $< -l $@
+	$(DLLTOOL) -m i386:x86-64 -D eowrecomp.exe -d $< -l $@
 $(GAMELIB): $(IMPLIB)
 endif
 
@@ -258,6 +260,29 @@ $(GEN_VENV)/.ok:
 	$(GEN_VPY) -m pip install -q capstone==5.0.9 unicorn==2.1.4 lz4==4.4.5 pyinstaller==6.22.3
 	touch $@
 
+# The flags the game code is compiled with on the player's machine (GAMELIB_CFLAGS in runtime/gamebuild.c): what
+# tools/zig_slim.sh is told so the slim compiler can build exactly that.
+print-gamelib-flags:
+	@echo $(strip $(filter-out -Iruntime,$(GENFLAGS)))
+
+ifeq ($(PLATFORM),windows)
+ifneq ($(WINCROSS),1)
+# make deps-windows: FFmpeg (LGPL only) built from pinned sources into build/deps-win (tools/build_deps_windows.sh).
+deps-windows:
+	tools/build_deps_windows.sh
+
+# make dist (MSYS2 UCRT64 shell on Windows): build/dist/EoWRecomp-windows-x64.zip, everything the player needs and no
+# game files: the runtime (no console window), its DLLs, the import library and headers the start screen builds the game
+# code against, the generator helper (eowgen) and the compiler (slim zig). Run `make deps-windows` first.
+dist:
+	$(MAKE) RELEASE=1 DEPS=build/deps-win $(EXE) $(IMPLIB)
+	$(MAKE) gen-helper GEN_PY=$(if $(DIST_PY),$(DIST_PY),python)
+	[ -x build/zig/zig.exe ] || tools/fetch_zig.sh
+	tools/zig_slim.sh $(shell $(MAKE) -s print-gamelib-flags)
+	tools/windows/package.sh
+endif
+endif
+
 # make app (macOS): build/EoWRecomp.app to ship - the runtime built against build/deps (tools/build_deps_macos.sh:
 # LGPL-only FFmpeg, SDL3), MoltenVK, and what the start screen builds the game code with (the generator helper, zig).
 # No game code or files inside (tools/bundle_macos.sh checks). For macOS 15+ (build/deps' minimum) unless MACOS_MIN.
@@ -268,7 +293,7 @@ app:
 	[ -x build/zig/zig ] || tools/fetch_zig.sh
 	MACOS_MIN=$(APP_MIN) tools/bundle_macos.sh build/rel/eowrecomp
 
-.PHONY: all gen gen-helper gen-objs runtime-objs app
+.PHONY: all gen gen-helper gen-objs runtime-objs app print-gamelib-flags deps-windows dist
 
 build/test_shaders: tools/test_shaders.m runtime/nvn/maxwell/translate.c runtime/nvn/maxwell/shader.h
 	clang -O1 -fobjc-arc -framework Metal -framework Foundation -o $@ tools/test_shaders.m runtime/nvn/maxwell/translate.c

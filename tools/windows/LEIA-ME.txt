@@ -1,0 +1,32 @@
+EoWRecomp para Windows (x64)
+============================
+
+Projeto de fã, sem afiliação com a Nintendo. Este pacote NÃO contém o jogo, chaves, código nem arquivos da Nintendo.
+Você precisa do SEU PRÓPRIO jogo, de uma cópia legal.
+
+Requisitos
+- Windows 10 ou 11, 64 bits.
+- Placa de vídeo com driver Vulkan 1.3 atualizado (AMD, NVIDIA ou Intel).
+- Processador com AVX2 e FMA (Intel Haswell/Broadwell ou mais novo; AMD Zen ou mais novo).
+- Espaço livre: alguns GB para os arquivos que o programa prepara a partir do seu jogo.
+
+Como usar
+1. Extraia o ZIP INTEIRO em uma pasta comum onde você tenha permissão de escrita (Área de Trabalho, Documentos,
+   D:\Jogos...). Não rode de dentro do ZIP e não use "Arquivos de Programas".
+2. Abra "Iniciar-EoWRecomp.bat" (ou eowrecomp.exe).
+3. Na tela inicial, selecione o arquivo do seu jogo (XCI ou NSP) e o seu prod.keys. O programa lê, converte e compila
+   tudo sozinho, com barra de progresso. Não precisa instalar compilador, Python, Visual Studio nem nada.
+   Isso é feito uma vez; leva um tempo (dezenas de minutos, dependendo do processador).
+4. Clique em jogar.
+
+Shaders
+- O programa guarda os shaders compilados em "cache\" (ao lado do .exe). Na primeira vez que você joga, parte deles
+  é compilada durante o jogo (pode haver pequenas pausas). As próximas execuções reaproveitam tudo e, quando a GPU, o
+  driver ou o programa mudam, os shaders já conhecidos são recompilados antes do jogo abrir, com barra de progresso.
+- Pode apagar a pasta "cache\" a qualquer momento: ela é refeita.
+
+Problemas
+- O arquivo "eowrecomp.log" (ao lado do .exe) registra o que aconteceu. Anexe-o ao relatar um problema.
+- "eowrecomp.exe --selftest" verifica se as bibliotecas do pacote estão completas (sem precisar do jogo).
+
+Licenças: veja a pasta "licenses".
