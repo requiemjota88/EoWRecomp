@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22)
+project(vkprobe C)
+add_library(vkprobe SHARED native-lib.c)
+find_library(vulkan-lib vulkan)
+find_library(log-lib log)
+target_link_libraries(vkprobe ${vulkan-lib} ${log-lib})
